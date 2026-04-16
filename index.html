@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RYSE Call Logs – TEST</title>
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0f1117;
+      --surface:     #1a1d27;
+      --surface2:    #22263a;
+      --border:      #2e3248;
+      --accent:      #f59e0b;
+      --accent2:     #fbbf24;
+      --green:       #22c55e;
+      --red:         #ef4444;
+      --text:        #f1f5f9;
+      --text-muted:  #8896b3;
+      --amber-bg:    rgba(245,158,11,0.08);
+      --green-bg:    rgba(34,197,94,0.07);
+      --header-h:    56px;
+      --radius:      10px;
+      --font:        'DM Sans', sans-serif;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────── */
+    #header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: var(--header-h);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 12px;
+    }
+
+    #header .logo {
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: .04em;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+    #header .logo span {
+      color: var(--text-muted);
+      font-weight: 400;
+      font-size: 12px;
+      margin-left: 6px;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    #header .spacer { flex: 1; }
+
+    #header .date-badge {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 12px;
+      white-space: nowrap;
+    }
+
+    /* Sign-in / sign-out button */
+    #signInBtn, #signOutBtn {
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 7px 16px;
+      transition: opacity .15s, transform .1s;
+      white-space: nowrap;
+    }
+    #signInBtn:hover, #signOutBtn:hover { opacity: .85; transform: translateY(-1px); }
+    #signInBtn  { background: var(--accent);  color: #000; }
+    #signOutBtn { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+
+    /* ── Status bar ───────────────────────────────────────────────── */
+    #statusBar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      font-size: 13px;
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+    }
+    #statusBar.visible { display: flex; }
+    #statusBar.info    { color: var(--text-muted); }
+    #statusBar.success { color: var(--green); }
+    #statusBar.error   { color: var(--red); }
+    #statusBar .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Unsaved indicator ────────────────────────────────────────── */
+    .unsaved-dot {
+      display: none;
+      width: 7px; height: 7px;
+      background: var(--accent);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .has-unsaved .unsaved-dot { display: inline-block; }
+
+    /* ── Main layout ──────────────────────────────────────────────── */
+    #main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* ── Welcome / sign-in prompt ─────────────────────────────────── */
+    #welcomeMsg {
+      text-align: center;
+      padding: 80px 20px;
+    }
+    #welcomeMsg h2 {
+      font-size: 22px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    #welcomeMsg p { color: var(--text-muted); font-size: 15px; }
+
+    /* ── No-events message ────────────────────────────────────────── */
+    #noEventsMsg {
+      display: none;
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-muted);
+    }
+    #noEventsMsg svg { opacity: .35; margin-bottom: 14px; }
+
+    /* ── Call card ────────────────────────────────────────────────── */
+    .call-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+    .call-card.current-call {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(245,158,11,.25);
+    }
+
+    /* Card header row */
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+    .card-header:hover { background: var(--surface2); }
+
+    .card-time {
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      min-width: 70px;
+    }
+    .card-name {
+      font-weight: 600;
+      font-size: 14px;
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Current call badge */
+    .current-badge {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      background: var(--accent);
+      color: #000;
+      border-radius: 4px;
+      padding: 2px 7px;
+      flex-shrink: 0;
+    }
+
+    /* Follow-up quick pill */
+    .followup-pill {
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 20px;
+      padding: 2px 10px;
+      flex-shrink: 0;
+      border: none;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    .followup-pill:hover { opacity: .8; }
+    .followup-pill.yes  { background: rgba(239,68,68,.15);  color: #f87171; }
+    .followup-pill.no   { background: rgba(34,197,94,.12);  color: #4ade80; }
+    .followup-pill.none { background: var(--surface2); color: var(--text-muted); }
+
+    /* Collapse chevron */
+    .chevron {
+      color: var(--text-muted);
+      transition: transform .2s;
+      flex-shrink: 0;
+    }
+    .call-card.collapsed .chevron { transform: rotate(-90deg); }
+
+    /* Card body */
+    .card-body {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .call-card.collapsed .card-body { display: none; }
+
+    /* Meta info row (phone / order) */
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .meta-chip {
+      font-size: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 10px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .meta-chip strong { color: var(--text); font-weight: 500; }
+
+    /* Field groups */
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    textarea {
+      font-family: var(--font);
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      width: 100%;
+      resize: vertical;
+      min-height: 80px;
+      transition: border-color .15s, background .15s;
+      outline: none;
+    }
+    textarea.issue-textarea { background: var(--amber-bg); }
+    textarea.notes-textarea  { background: var(--green-bg); }
+    textarea:focus { border-color: var(--accent2); }
+    textarea::placeholder { color: #4a5472; }
+    textarea.dirty { border-color: rgba(245,158,11,.5); }
+
+    /* Follow-up row */
+    .followup-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .toggle-group {
+      display: flex;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .toggle-group label {
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 18px;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      color: var(--text-muted);
+    }
+    .toggle-group input[type="radio"] { display: none; }
+    .toggle-group input[type="radio"]:checked + label {
+      background: var(--surface2);
+      color: var(--text);
+    }
+    .toggle-group .opt-yes input:checked + label { background: rgba(239,68,68,.18); color: #f87171; }
+    .toggle-group .opt-no  input:checked + label { background: rgba(34,197,94,.15); color: #4ade80; }
+
+    /* Category select */
+    select.category-select {
+      font-family: var(--font);
+      font-size: 13px;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      outline: none;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238896b3' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      padding-right: 30px;
+      transition: border-color .15s;
+    }
+    select.category-select:focus { border-color: var(--accent2); }
+
+    /* Save button */
+    .save-btn {
+      align-self: flex-start;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 20px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: opacity .15s, transform .1s;
+    }
+    .save-btn:hover:not(:disabled) { opacity: .88; transform: translateY(-1px); }
+    .save-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .save-btn .btn-spinner {
+      width: 12px; height: 12px;
+      border: 2px solid rgba(0,0,0,.3);
+      border-top-color: #000;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      display: none;
+    }
+    .save-btn.saving .btn-spinner { display: block; }
+    .save-btn.saving .btn-label   { display: none; }
+
+    /* ── Retry banner ─────────────────────────────────────────────── */
+    .retry-banner {
+      display: none;
+      font-size: 12px;
+      color: #fbbf24;
+      background: rgba(251,191,36,.08);
+      border: 1px solid rgba(251,191,36,.2);
+      border-radius: 6px;
+      padding: 6px 12px;
+      align-items: center;
+      gap: 8px;
+    }
+    .retry-banner.visible { display: flex; }
+    .retry-btn {
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 600;
+      background: transparent;
+      color: #fbbf24;
+      border: 1px solid rgba(251,191,36,.4);
+      border-radius: 5px;
+      padding: 2px 10px;
+      cursor: pointer;
+    }
+
+    /* ── TEST environment banner ──────────────────────────────────── */
+    #testBanner {
+      background: rgba(239,68,68,.12);
+      border-bottom: 1px solid rgba(239,68,68,.25);
+      color: #f87171;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      padding: 6px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    /* ── Mobile ───────────────────────────────────────────────────── */
+    @media (max-width: 600px) {
+      #header { padding: 0 12px; gap: 8px; }
+      #main { padding: 16px 12px 60px; }
+      .card-header { padding: 12px; }
+      .card-body { padding: 12px; }
+      .followup-row { gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- TEST environment warning -->
+<div id="testBanner">⚠ TEST ENVIRONMENT — Data saved to test sheet only</div>
+
+<!-- Header -->
+<header id="header">
+  <div class="logo">RYSE <span>Call Logs</span></div>
+  <div class="spacer"></div>
+  <div class="date-badge" id="headerDate"></div>
+  <button id="signInBtn"  onclick="handleSignIn()"  aria-label="Sign in with Google">Sign in with Google</button>
+  <button id="signOutBtn" onclick="handleSignOut()" aria-label="Sign out" style="display:none">Sign out</button>
+</header>
+
+<!-- Status bar -->
+<div id="statusBar" role="status" aria-live="polite">
+  <div class="spinner" id="statusSpinner"></div>
+  <span id="statusText"></span>
+</div>
+
+<!-- Main -->
+<main id="main">
+  <div id="welcomeMsg">
+    <h2>Welcome back 👋</h2>
+    <p>Sign in with Google to load today's support calls.</p>
+  </div>
+  <div id="noEventsMsg" role="alert">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+    <p>No support calls found for today.</p>
+  </div>
+  <div id="callsContainer"></div>
+</main>
+
+<script>
+/* ─────────────────────────────────────────────────────────────────
+   CONFIG
+───────────────────────────────────────────────────────────────── */
+const CONFIG = {
+  CLIENT_ID:      '1046847497846-hgdkmgpd53pbq5uiv9vhbigv133hj8ha.apps.googleusercontent.com',
+  SHEET_ID:       '1hT1xFLmVuptyT_RhTkYcu4z96xo6RVSPu2LNfWqQ0Hs',
+  APPS_SCRIPT_URL:'https://script.google.com/macros/s/AKfycbwtYxAAb8ob0QefsTELi1X3vtUJ47K152M6KjgU60fh4g96uk7yrJzBh9BH-xknqNjj/exec',
+  SCOPES:         'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/spreadsheets',
+};
+
+/* ─────────────────────────────────────────────────────────────────
+   STATE
+───────────────────────────────────────────────────────────────── */
+let accessToken = null;
+let tokenClient = null;
+let events      = [];          // raw calendar events
+let cardStates  = {};          // { eventId: { issue, notes, followUp, category, dirty } }
+let retryQueues = {};          // { eventId: pendingSavePayload }
+
+/* ─────────────────────────────────────────────────────────────────
+   DATE HELPERS
+───────────────────────────────────────────────────────────────── */
+function todayEDT() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Toronto' });
+}
+function toEDT(isoString) {
+  return new Date(isoString).toLocaleTimeString('en-US', {
+    timeZone: 'America/Toronto', hour: 'numeric', minute: '2-digit', hour12: true
+  });
+}
+function toTitleCase(str) {
+  return str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+function isCurrentCall(event) {
+  const now = new Date();
+  const start = new Date(event.start.dateTime || event.start.date);
+  const end   = new Date(event.end.dateTime || event.end.date);
+  return now >= start && now <= end;
+}
+function setHeaderDate() {
+  const d = new Date().toLocaleDateString('en-US', {
+    timeZone: 'America/Toronto', weekday: 'long', month: 'long', day: 'numeric'
+  });
+  document.getElementById('headerDate').textContent = d;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   STATUS BAR
+───────────────────────────────────────────────────────────────── */
+let statusTimer = null;
+function setStatus(msg, type = 'info', autoHide = false) {
+  const bar = document.getElementById('statusBar');
+  const txt = document.getElementById('statusText');
+  const spn = document.getElementById('statusSpinner');
+  bar.className = `visible ${type}`;
+  txt.textContent = msg;
+  spn.style.display = type === 'info' ? 'block' : 'none';
+  clearTimeout(statusTimer);
+  if (autoHide) statusTimer = setTimeout(() => { bar.className = ''; }, 3000);
+}
+function hideStatus() { document.getElementById('statusBar').className = ''; }
+
+/* ─────────────────────────────────────────────────────────────────
+   AUTH
+───────────────────────────────────────────────────────────────── */
+window.onload = () => {
+  setHeaderDate();
+  google.accounts.id.initialize({ client_id: CONFIG.CLIENT_ID, callback: () => {} });
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CONFIG.CLIENT_ID,
+    scope: CONFIG.SCOPES,
+    callback: (resp) => {
+      if (resp.error) { setStatus('Sign-in failed: ' + resp.error, 'error', true); return; }
+      accessToken = resp.access_token;
+      sessionStorage.setItem('ryse_token', accessToken);
+      onSignedIn();
+    }
+  });
+  const cached = sessionStorage.getItem('ryse_token');
+  if (cached) { accessToken = cached; onSignedIn(); }
+};
+
+function handleSignIn() {
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+function handleSignOut() {
+  google.accounts.oauth2.revoke(accessToken, () => {});
+  accessToken = null;
+  sessionStorage.removeItem('ryse_token');
+  document.getElementById('signInBtn').style.display  = '';
+  document.getElementById('signOutBtn').style.display = 'none';
+  document.getElementById('callsContainer').innerHTML = '';
+  document.getElementById('welcomeMsg').style.display = '';
+  document.getElementById('noEventsMsg').style.display = 'none';
+  hideStatus();
+}
+
+function onSignedIn() {
+  document.getElementById('signInBtn').style.display  = 'none';
+  document.getElementById('signOutBtn').style.display = '';
+  document.getElementById('welcomeMsg').style.display = 'none';
+  loadEvents();
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   CALENDAR
+───────────────────────────────────────────────────────────────── */
+async function loadEvents() {
+  setStatus('Loading today\'s calls…');
+  const today = todayEDT();
+  const tMin  = today + 'T00:00:00-04:00';
+  const tMax  = today + 'T23:59:59-04:00';
+  const url   = `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${encodeURIComponent(tMin)}&timeMax=${encodeURIComponent(tMax)}&singleEvents=true&orderBy=startTime`;
+  try {
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + accessToken } });
+    if (!res.ok) throw new Error('Calendar API ' + res.status);
+    const data = await res.json();
+    events = filterSupportCalls(data.items || []);
+    if (events.length === 0) {
+      hideStatus();
+      document.getElementById('noEventsMsg').style.display = 'block';
+      return;
+    }
+    renderCards();
+    await pushToSheet();
+  } catch (e) {
+    setStatus('Error loading calendar: ' + e.message, 'error', true);
+  }
+}
+
+function filterSupportCalls(items) {
+  const EXCLUDE = ['customer support update','weekly check-in','team meeting','standup','sync'];
+  return items.filter(ev => {
+    const title = (ev.summary || '').toLowerCase();
+    const desc  = (ev.description || '');
+    if (EXCLUDE.some(x => title.includes(x))) return false;
+    const hasName  = /pranav pallam/i.test(title);
+    const hasCal   = desc.includes('Calendly');
+    const hasPhone = /\+?1?\s*\(?\d{3}\)?\s*[\-.]?\s*\d{3}\s*[\-.]?\s*\d{4}/.test(desc);
+    const hasOrder = /order\s*(number)?[\s:]+\S+/i.test(desc);
+    return hasName || hasCal || hasPhone || hasOrder;
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   EXTRACT DATA FROM DESCRIPTION
+───────────────────────────────────────────────────────────────── */
+function extractField(desc, regex) {
+  const m = desc.match(regex);
+  return m ? m[1].trim() : '';
+}
+function parseDescription(ev) {
+  const desc = ev.description || '';
+  const issue  = extractField(desc, /troubleshooting[\s\S]*?:\s*ANSWER\s+([\s\S]*?)(?:\n\n|\n(?=[A-Z]))/i)
+              || extractField(desc, /What (?:is|are) you (?:trying to|having trouble)[^?]+\?\s*\n+(.+)/i)
+              || '';
+  const order  = extractField(desc, /order\s*(?:number)?[\s:]+([A-Z0-9\-]+)/i);
+  const phone  = (desc.match(/\+?1?\s*\(?\d{3}\)?\s*[\-.]?\s*\d{3}\s*[\-.]?\s*\d{4}/) || [])[0] || '';
+  const device = extractField(desc, /(iOS|Android)/i);
+  return { issue, order, phone, device };
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   RENDER CARDS
+───────────────────────────────────────────────────────────────── */
+function renderCards() {
+  hideStatus();
+  const container = document.getElementById('callsContainer');
+  container.innerHTML = '';
+
+  events.forEach((ev, i) => {
+    const id     = ev.id;
+    const parsed = parseDescription(ev);
+    const isCurrent = isCurrentCall(ev);
+
+    // Init state
+    if (!cardStates[id]) {
+      cardStates[id] = {
+        issue:    parsed.issue,
+        notes:    '',
+        followUp: '',
+        category: '',
+        dirty:    false,
+      };
+    }
+    const st = cardStates[id];
+
+    const card = document.createElement('div');
+    card.className = 'call-card' + (isCurrent ? ' current-call' : '');
+    card.id = 'card-' + id;
+
+    const rawTitle = ev.summary || 'Support Call';
+    const callerName = toTitleCase(
+      rawTitle.replace(/and\s+pranav\s+pallam/i, '').replace(/pranav\s+pallam\s+and/i, '').replace(/pranav pallam/i, '').replace(/RYSE\s*(Support|Call)?/i, '').replace(/[-–|]/g, '').trim()
+      || rawTitle
+    );
+
+    const startTime = toEDT(ev.start.dateTime || ev.start.date);
+    const fuClass = st.followUp === 'Yes' ? 'yes' : st.followUp === 'No' ? 'no' : 'none';
+    const fuLabel = st.followUp || 'Follow-up?';
+
+    card.innerHTML = `
+      <!-- Header row (clickable to collapse) -->
+      <div class="card-header" onclick="toggleCard('${id}')" aria-expanded="true" role="button" tabindex="0"
+           onkeydown="if(event.key==='Enter'||event.key===' ')toggleCard('${id}')">
+        <span class="card-time">${startTime}</span>
+        ${isCurrent ? '<span class="current-badge">Now</span>' : ''}
+        <span class="card-name" title="${callerName}">${callerName}</span>
+        <span class="unsaved-dot" id="dot-${id}" aria-hidden="true" title="Unsaved changes"></span>
+        <button class="followup-pill ${fuClass}" id="pill-${id}"
+          onclick="event.stopPropagation(); cycleFollowUp('${id}')"
+          aria-label="Follow-up: ${fuLabel}">${fuLabel}</button>
+        <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+      </div>
+
+      <!-- Body -->
+      <div class="card-body" id="body-${id}">
+
+        <!-- Meta chips -->
+        <div class="meta-row" id="meta-${id}">
+          ${parsed.phone  ? `<span class="meta-chip">📞 <strong>${parsed.phone}</strong></span>`  : ''}
+          ${parsed.order  ? `<span class="meta-chip">📦 Order <strong>${parsed.order}</strong></span>` : ''}
+          ${parsed.device ? `<span class="meta-chip">📱 <strong>${parsed.device}</strong></span>` : ''}
+        </div>
+
+        <!-- Issue description -->
+        <div class="field-group">
+          <label class="field-label" for="issue-${id}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+            Issue Description
+          </label>
+          <textarea id="issue-${id}" class="issue-textarea" rows="2" placeholder="What is the customer's issue?"
+            oninput="markDirty('${id}')"
+            aria-label="Issue description for ${callerName}">${escHtml(st.issue)}</textarea>
+        </div>
+
+        <!-- Call notes -->
+        <div class="field-group">
+          <label class="field-label" for="notes-${id}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            Call Notes
+          </label>
+          <textarea id="notes-${id}" class="notes-textarea" rows="3" placeholder="Add notes during or after the call…"
+            oninput="markDirty('${id}')"
+            aria-label="Call notes for ${callerName}">${escHtml(st.notes)}</textarea>
+        </div>
+
+        <!-- Follow-up + Category row -->
+        <div class="followup-row">
+          <div class="field-group" style="flex-shrink:0">
+            <span class="field-label">Follow-Up</span>
+            <div class="toggle-group" role="radiogroup" aria-label="Follow-up needed?">
+              <div class="opt-yes">
+                <input type="radio" name="fu-${id}" id="fu-yes-${id}" value="Yes"
+                  ${st.followUp === 'Yes' ? 'checked' : ''}
+                  onchange="onFollowUpChange('${id}', 'Yes')">
+                <label for="fu-yes-${id}">Yes</label>
+              </div>
+              <div class="opt-no">
+                <input type="radio" name="fu-${id}" id="fu-no-${id}" value="No"
+                  ${st.followUp === 'No' ? 'checked' : ''}
+                  onchange="onFollowUpChange('${id}', 'No')">
+                <label for="fu-no-${id}">No</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="field-group" style="flex-shrink:0">
+            <label class="field-label" for="cat-${id}">Issue Category</label>
+            <select class="category-select" id="cat-${id}"
+              onchange="markDirty('${id}')"
+              aria-label="Issue category for ${callerName}">
+              <option value="" ${!st.category ? 'selected' : ''}>Select…</option>
+              <option value="Technical"     ${st.category==='Technical'?'selected':''}>Technical</option>
+              <option value="Install"       ${st.category==='Install'?'selected':''}>Install</option>
+              <option value="Other"         ${st.category==='Other'?'selected':''}>Other</option>
+            </select>
+          </div>
+
+          <div style="flex:1"></div>
+
+          <button class="save-btn" id="save-${id}" onclick="saveCard('${id}')"
+            aria-label="Save notes for ${callerName}">
+            <div class="btn-spinner" aria-hidden="true"></div>
+            <span class="btn-label">Save to Sheet</span>
+          </button>
+        </div>
+
+        <!-- Retry banner -->
+        <div class="retry-banner" id="retry-${id}" role="alert">
+          ⚠ Last save failed.
+          <button class="retry-btn" onclick="retrySave('${id}')">Retry</button>
+        </div>
+
+      </div>
+    `;
+
+    container.appendChild(card);
+
+    // Remove empty meta row
+    const metaRow = card.querySelector(`#meta-${id}`);
+    if (metaRow && !metaRow.children.length) metaRow.remove();
+  });
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   CARD INTERACTIONS
+───────────────────────────────────────────────────────────────── */
+function toggleCard(id) {
+  const card = document.getElementById('card-' + id);
+  card.classList.toggle('collapsed');
+  const header = card.querySelector('.card-header');
+  header.setAttribute('aria-expanded', card.classList.contains('collapsed') ? 'false' : 'true');
+}
+
+function markDirty(id) {
+  cardStates[id].dirty = true;
+  const card = document.getElementById('card-' + id);
+  if (card) card.classList.add('has-unsaved');
+  // Sync textarea border
+  const issue = document.getElementById('issue-' + id);
+  const notes = document.getElementById('notes-' + id);
+  if (issue) issue.classList.add('dirty');
+  if (notes) notes.classList.add('dirty');
+}
+
+function clearDirty(id) {
+  cardStates[id].dirty = false;
+  const card = document.getElementById('card-' + id);
+  if (card) card.classList.remove('has-unsaved');
+  const issue = document.getElementById('issue-' + id);
+  const notes = document.getElementById('notes-' + id);
+  if (issue) issue.classList.remove('dirty');
+  if (notes) notes.classList.remove('dirty');
+}
+
+function onFollowUpChange(id, value) {
+  cardStates[id].followUp = value;
+  markDirty(id);
+  updatePill(id, value);
+}
+
+function cycleFollowUp(id) {
+  const cur = cardStates[id].followUp;
+  const next = cur === '' ? 'Yes' : cur === 'Yes' ? 'No' : '';
+  cardStates[id].followUp = next;
+  // Sync radio
+  if (next) {
+    const radio = document.getElementById(`fu-${next === 'Yes' ? 'yes' : 'no'}-${id}`);
+    if (radio) radio.checked = true;
+  } else {
+    document.querySelectorAll(`input[name="fu-${id}"]`).forEach(r => r.checked = false);
+  }
+  markDirty(id);
+  updatePill(id, next);
+}
+
+function updatePill(id, value) {
+  const pill = document.getElementById('pill-' + id);
+  if (!pill) return;
+  pill.className = 'followup-pill ' + (value === 'Yes' ? 'yes' : value === 'No' ? 'no' : 'none');
+  pill.textContent = value || 'Follow-up?';
+  pill.setAttribute('aria-label', 'Follow-up: ' + (value || 'unset'));
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   SAVE
+───────────────────────────────────────────────────────────────── */
+async function saveCard(id) {
+  const ev = events.find(e => e.id === id);
+  if (!ev) return;
+
+  const issue    = document.getElementById('issue-' + id).value.trim();
+  const notes    = document.getElementById('notes-' + id).value.trim();
+  const followUp = cardStates[id].followUp || '';
+  const category = document.getElementById('cat-' + id).value;
+
+  // Cache state
+  cardStates[id].issue    = issue;
+  cardStates[id].notes    = notes;
+  cardStates[id].followUp = followUp;
+  cardStates[id].category = category;
+
+  const payload = buildPayload(ev, issue, notes, followUp, category, 'update');
+  await doSave(id, payload);
+}
+
+async function retrySave(id) {
+  const payload = retryQueues[id];
+  if (!payload) return;
+  await doSave(id, payload);
+}
+
+async function doSave(id, payload, attempt = 1) {
+  const btn = document.getElementById('save-' + id);
+  const retryBanner = document.getElementById('retry-' + id);
+  if (btn) btn.classList.add('saving');
+  if (retryBanner) retryBanner.classList.remove('visible');
+  retryQueues[id] = payload; // store in case of failure
+
+  try {
+    const url = CONFIG.APPS_SCRIPT_URL + '?data=' + encodeURIComponent(JSON.stringify(payload));
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Unknown error');
+
+    // Success
+    delete retryQueues[id];
+    clearDirty(id);
+    setStatus('Saved!', 'success', true);
+  } catch (e) {
+    // Auto-retry once
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 1500));
+      if (btn) btn.classList.remove('saving');
+      return doSave(id, payload, attempt + 1);
+    }
+    setStatus('Save failed — check connection', 'error', true);
+    if (retryBanner) retryBanner.classList.add('visible');
+  } finally {
+    if (btn) btn.classList.remove('saving');
+  }
+}
+
+function buildPayload(ev, issue, notes, followUp, category, action) {
+  const today = todayEDT();
+  const time  = toEDT(ev.start.dateTime || ev.start.date);
+  const rawTitle = ev.summary || 'Support Call';
+  const callerName = toTitleCase(
+    rawTitle.replace(/and\s+pranav\s+pallam/i, '').replace(/pranav\s+pallam\s+and/i, '').replace(/pranav pallam/i, '').replace(/RYSE\s*(Support|Call)?/i, '').replace(/[-–|]/g, '').trim()
+    || rawTitle
+  );
+  return {
+    action,
+    date:      today,
+    time,
+    event:     callerName,
+    issue,
+    notes,
+    followUp,
+    category,
+    sheetId:   CONFIG.SHEET_ID,
+  };
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   PUSH EVENTS TO SHEET (add on load)
+───────────────────────────────────────────────────────────────── */
+async function pushToSheet() {
+  setStatus('Syncing to sheet…');
+  let anyFailed = false;
+  for (const ev of events) {
+    const parsed = parseDescription(ev);
+    const payload = buildPayload(ev, parsed.issue, '', '', '', 'add');
+    try {
+      const url = CONFIG.APPS_SCRIPT_URL + '?data=' + encodeURIComponent(JSON.stringify(payload));
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+    } catch (e) {
+      anyFailed = true;
+    }
+  }
+  if (anyFailed) {
+    setStatus('Sheet sync failed (you can still take notes)', 'error', true);
+  } else {
+    setStatus('Ready', 'success', true);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   UTILS
+───────────────────────────────────────────────────────────────── */
+function escHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
